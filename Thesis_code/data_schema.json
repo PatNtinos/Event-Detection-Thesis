@@ -1,0 +1,7 @@
+{
+  "id": "string",
+  "text": "string",
+  "created_at": "ISO-8601 string",
+  "lang": "string",
+  "source": "twitter"
+}

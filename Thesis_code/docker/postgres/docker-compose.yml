@@ -1,0 +1,22 @@
+services:
+  postgres:
+    # Using official Postgres image
+    image: postgres:16
+    # Naming the container
+    container_name: postgres
+    # If for some reason it stops, restart it automatically
+    restart: always
+    environment:
+      # Simple credentials for Postgres
+      POSTGRES_USER: thesis_user
+      POSTGRES_PASSWORD: thesis_pass
+      POSTGRES_DB: thesis_db
+    ports:
+      # Default Postgres port
+      - "5432:5432"
+    # So data is not lost when container stops
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+# Create Docker volume, like a storage bucket 
+volumes:
+  postgres_data:

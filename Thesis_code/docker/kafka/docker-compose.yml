@@ -1,0 +1,44 @@
+
+# The version of the Docker Compose / I guess it autodetects it anyway
+#version: "3.8"
+
+# What containers i want to run
+services:
+  # Zookeeper for kafka, old but simple
+  zookeeper:
+    # Using bitnami zookeeper image as it is ready-made for use
+    image: confluentinc/cp-zookeeper:7.5.0
+    # Naming the container
+    container_name: zookeeper
+    # Standard zookeeper port
+    ports:
+      - "2181:2181"
+    # No need for authentication in this project
+    environment:
+      # Client port
+      ZOOKEEPER_CLIENT_PORT: 2181
+      # Heartbeat "i am alive"
+      ZOOKEEPER_TICK_TIME: 2000
+  # Kafka broker
+  kafka:
+    # Again using bitnami image for simplicity
+    image: confluentinc/cp-kafka:7.5.0
+    # Naming the container
+    container_name: kafka
+    # Needs Zookeeper to run for it to work
+    depends_on:
+      - zookeeper
+    #Kafka Port
+    ports:
+      - "9092:9092"
+    environment:
+      # Each Broker needs a unique ID
+      KAFKA_BROKER_ID: 1
+      # Zookeeper connection string
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      # Listens on this port
+      KAFKA_LISTENERS: PLAINTEXT://:9092
+      # Port for clients to connect
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      # Have a single replica for simplicity
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
