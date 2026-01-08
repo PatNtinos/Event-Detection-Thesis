@@ -50,7 +50,7 @@ def main():
     cursor.execute("""
         SELECT t.id, t.text
         FROM tweets t
-        LEFT JOIN text_embeddings e 
+        LEFT JOIN content_metadata e 
             ON e.source = 'twitter'
             AND e.source_id = t.id
         WHERE e.source_id IS NULL
@@ -87,7 +87,7 @@ def main():
     # For TWITTER
     for tweet_id, text, vector in zip(tweet_ids, texts, embeddings):
         cursor.execute("""
-            INSERT INTO text_embeddings (source, source_id, text, embedding, model_name)
+            INSERT INTO content_metadata (source, source_id, text, embedding, model_name)
             VALUES (%s, %s, %s, %s, %s)
             ON CONFLICT (source, source_id) DO NOTHING;
         """, ("twitter",tweet_id, text, vector.tolist(), MODEL_NAME))
