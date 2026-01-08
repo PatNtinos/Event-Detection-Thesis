@@ -4,6 +4,8 @@ import psycopg2
 import hdbscan
 # For array manipulations
 import numpy as np
+# To present how many clusters and with how many members
+from collections import Counter
 
 # -------- CONFIG --------
 # Database connection parameters to login to PostgreSQL
@@ -73,7 +75,7 @@ def save_cluster_assignments(run_id, ids, labels):
     for idx, label in zip(ids, labels):
         cursor.execute("""
             UPDATE content_metadata
-            SET cluster_id = %s, cluster_label = %s
+            SET cluster_run_id = %s, cluster_label = %s
             WHERE id = %s;
         """, (run_id, int(label), idx))
     
@@ -107,7 +109,16 @@ def main():
     
     # 4. Save cluster assignments
     save_cluster_assignments(run_id, ids, labels)
-    print(f"Clustering done! {len(set(labels))} clusters found.")
+    print(f"Clustering done!")
+
+    # 5. Print cluster distribution
+
+    counts = Counter(labels)
+
+    print("Cluster distribution:")
+    # Sort: real clusters first, then noise (-1) at the end
+    for cid in sorted(counts.keys(), key=lambda x: (x == -1, x)): # False comes first, True last False<True
+        print(f"Cluster {cid}: {counts[cid]} points")
 
 if __name__ == "__main__":
     main()
