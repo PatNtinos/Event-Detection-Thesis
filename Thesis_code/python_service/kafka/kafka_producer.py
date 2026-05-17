@@ -1,31 +1,59 @@
 # We need the KafkaProducer class
 from kafka import KafkaProducer
 # Add twitter client to fetch tweets
-from python_service.twitter_api.twitter_client import fetch_from_twitter_api
+from python_service.twitter_api.twitter_client import fetch_all_events
 # To handle the JSON messages
 import json
 # To simulate streaming
 import time
 
-producer = KafkaProducer(
-    # Kafka broker address
-    bootstrap_servers='localhost:9092',
-    # Change JSON to bytes
-    value_serializer=lambda v: json.dumps(v).encode('utf-8')
-)
+# ========================
+# CONFIG
+# ========================
+KAFKA_TOPIC = "events"
+KAFKA_BROKER = "localhost:9092"
+POLL_INTERVAL = 3600  # seconds
 
-# Simulate continuous streaming
-while True:
-    # Exception if twitter API doesn't work 
-    try:
-        tweets = fetch_from_twitter_api()
-        # Send each tweet to Kafka topic
-        for tweet in tweets:
-            producer.send('tweets', tweet)
-        # Ensure all messages are sent
-        producer.flush()
-        print(f"Sent {len(tweets)} tweets to Kafka")
-    except Exception as e:
-        print("Error fetching/sending tweets:", e)
-    # Batches of 1 minute MUST CHANGE LATER
-    time.sleep(60)
+
+# ========================
+# PRODUCER SETUP
+# ========================
+def create_producer():
+    return KafkaProducer(
+        bootstrap_servers=KAFKA_BROKER,
+        value_serializer=lambda v: json.dumps(v).encode("utf-8")
+    )
+
+
+# ========================
+# MAIN LOOP
+# ========================
+def run_producer():
+    producer = create_producer()
+
+    print("🚀 Kafka Producer started...")
+
+    while True:
+        try:
+            events = fetch_all_events()
+
+            if not events:
+                print("⚠️ No events fetched")
+            else:
+                for event in events:
+                    producer.send(KAFKA_TOPIC, event)
+
+                producer.flush()
+                print(f"✅ Sent {len(events)} events to Kafka")
+
+        except Exception as e:
+            print("❌ Producer error:", e)
+
+        time.sleep(POLL_INTERVAL)
+
+
+# ========================
+# ENTRY POINT
+# ========================
+if __name__ == "__main__":
+    run_producer()

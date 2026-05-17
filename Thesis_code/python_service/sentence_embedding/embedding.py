@@ -9,7 +9,7 @@ from sentence_transformers import SentenceTransformer
 import time
 
 while True:
-    main()  # embed all new tweets
+    main()  # embed all new posts
     time.sleep(60)  # wait 1 minute
 """
 # -------- CONFIG --------
@@ -27,34 +27,36 @@ MODEL_NAME = "all-MiniLM-L6-v2"
 # Batch size for embedding
 BATCH_SIZE = 16  
 
+#  Load SBERT model ONCE
+print("Loading embedding model...")
+model = SentenceTransformer(MODEL_NAME)
+print("Model loaded.")
 
 # Cleaning function for text
 def normalize_text(text: str) -> str:
     """Minimal text cleaning"""
-    return text.strip().lower()
+    return text.strip()
 
 
 def main():
+
+    print("\n🔍 Starting embedding process...\n")
     # 1. Connect to database
     # to connect to PostgreSQL
     conn = psycopg2.connect(**DB_CONFIG)
     # to execute queries
     cursor = conn.cursor()
 
-    # 2. Load SBERT model ONCE
-    print("Loading embedding model...")
-    model = SentenceTransformer(MODEL_NAME)
-    print("Model loaded.")
+    
 
-    # 3. Fetch tweets WITHOUT embeddings
+    # 3. Fetch content posts WITHOUT embeddings
     cursor.execute("""
-        SELECT t.id, t.text
-        FROM tweets t
+        SELECT c.source_id, c.source, c.text
+        FROM content c
         LEFT JOIN content_metadata e 
-            ON e.source = 'twitter'
-            AND e.source_id = t.id
-        WHERE e.source_id IS NULL
-        LIMIT 50;
+            ON e.source = c.source
+            AND e.source_id = c.source_id
+        WHERE e.source_id IS NULL;
     """)
 
     # retrieve all rows from the executed query
@@ -62,19 +64,21 @@ def main():
 
     # For debugging
     if not rows:
-        print("No new tweets to embed.")
+        print("No new content to embed.")
         return
 
-    tweet_ids = []
+    source_ids = []
+    sources = []
     texts = []
 
-    # Fill lists with tweet IDs and normalized texts from the SQL query result
-    for tweet_id, text in rows:
-        tweet_ids.append(tweet_id)
+    # Fill lists with posts IDs and normalized texts from the SQL query result
+    for source_id, source, text in rows:
+        source_ids.append(source_id)
+        sources.append(source)
         texts.append(normalize_text(text))
 
     # 4. Create embeddings (BATCHED)
-    print(f"Embedding {len(texts)} tweets...")
+    print(f"Embedding {len(texts)} posts...")
     # Turn texts into embeddings
     embeddings = model.encode(
         texts,
@@ -83,14 +87,14 @@ def main():
     )
 
     # 5. Store embeddings
-    # Match tweet IDs with their embeddings and insert into the database
+    # Match post IDs with their embeddings and insert into the database
     # For TWITTER
-    for tweet_id, text, vector in zip(tweet_ids, texts, embeddings):
+    for source, source_id, text, vector in zip(sources, source_ids, texts, embeddings):
         cursor.execute("""
-            INSERT INTO content_metadata (source, source_id, text, embedding, model_name)
-            VALUES (%s, %s, %s, %s, %s)
+            INSERT INTO content_metadata (source, source_id, embedding, model_name)
+            VALUES (%s, %s, %s, %s)
             ON CONFLICT (source, source_id) DO NOTHING;
-        """, ("twitter",tweet_id, text, vector.tolist(), MODEL_NAME))
+        """, (source, source_id, vector.tolist(), MODEL_NAME))
 
     # Saave changes
     conn.commit()

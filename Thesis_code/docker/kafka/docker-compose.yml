@@ -6,7 +6,7 @@
 services:
   # Zookeeper for kafka, old but simple
   zookeeper:
-    # Using bitnami zookeeper image as it is ready-made for use
+    # Using confluentinc zookeeper image as it is ready-made for use
     image: confluentinc/cp-zookeeper:7.5.0
     # Naming the container
     container_name: zookeeper
@@ -21,7 +21,7 @@ services:
       ZOOKEEPER_TICK_TIME: 2000
   # Kafka broker
   kafka:
-    # Again using bitnami image for simplicity
+    # Again using confluentinc image for simplicity
     image: confluentinc/cp-kafka:7.5.0
     # Naming the container
     container_name: kafka

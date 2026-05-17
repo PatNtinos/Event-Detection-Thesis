@@ -21,7 +21,7 @@ cursor = conn.cursor()
 
 consumer = KafkaConsumer(
     # Kafka topic
-    'tweets',
+    'events',
     # Kafka broker address
     bootstrap_servers='localhost:9092',
     # Consumer group ID, so it has memory
@@ -35,31 +35,39 @@ consumer = KafkaConsumer(
 )
 
 # So we know it runs
+print("🚀 Kafka Consumer started...")
 print("Waiting for messages...")
 
-# SQL command to insert tweet data into tweets table
+# SQL command to insert tweet data into content table
 insert_query = """
-INSERT INTO tweets (id, text, created_at, lang, source)
+INSERT INTO content (source_id, text, created_at, lang, source)
 VALUES (%s, %s, %s, %s, %s)
-ON CONFLICT (id) DO NOTHING;
+ON CONFLICT (source, source_id) DO NOTHING;
 """
 
 
 
 # For each message received
 for message in consumer:
-    tweet = message.value
-    # Print the tweet id, just to be sure it's working
-    print(f"[{tweet['created_at']}] {tweet['id']}")
+    content = message.value
+    
+    
+    # TESTING PURPOSES
+    # Print the content id, just to be sure it's working
+    #print(f"[{content.get('created_at')}] {content['source_id']}")
 
-    # Insert tweet into PostgreSQL
+    # Insert content into PostgreSQL
     # execute this SQL command
-    cursor.execute(insert_query,(
-        tweet['id'],
-        tweet['text'], 
-        tweet['created_at'],
-        tweet["lang"], 
-        tweet["source"]
-    ))
+    try:
+        cursor.execute(insert_query,(
+            content['source_id'],
+            content['text'], 
+            content.get('created_at'),
+            content["lang"], 
+            content["source"]
+        ))
+    except Exception as e:
+        print("DB insert error:", e)
+        conn.rollback()    
     # Save all changes in the transaction
     conn.commit()

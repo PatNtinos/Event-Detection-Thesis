@@ -17,7 +17,7 @@ DB_CONFIG = {
     "port": 5432
 }
 
-def fetch_embeddings():
+def fetch_recent_embeddings():
     """Fetch embeddings from the database."""
     # Connect with the DB
     conn = psycopg2.connect(**DB_CONFIG)
@@ -26,9 +26,10 @@ def fetch_embeddings():
     
     # Bring the embeddings with their IDs
     cursor.execute("""
-        SELECT id, embedding
+        SELECT id, source, source_id, embedding
         FROM content_metadata
-        WHERE embedding IS NOT NULL;
+        WHERE embedding IS NOT NULL
+        AND created_at >= NOW() - INTERVAL '24 hours';
     """)
     
     # Get all rows as a list of tuples
@@ -38,15 +39,166 @@ def fetch_embeddings():
     
     # If no embeddings found return empty arrays
     if not rows:
-        return [], []
+        return [], [], [], None
     
-    # Gets all IDs into a list
-    ids = [r[0] for r in rows]
-    # Convert embeddings from list to numpy arrays
-    embeddings = [np.array(r[1]) for r in rows]
+    ids = []
+    sources = []
+    source_ids = []
+    embeddings = []
+    
+    for r in rows:
+        ids.append(r[0])
+        sources.append(r[1])
+        source_ids.append(r[2])
+        embeddings.append(np.array(r[3]))
     
     # Return IDs and array of embeddings
-    return ids, np.vstack(embeddings) 
+    return ids, sources, source_ids, np.vstack(embeddings) 
+
+def run_clustering(embeddings):
+    clusterer = hdbscan.HDBSCAN(
+        min_cluster_size=5,
+        min_samples=1,
+        metric='euclidean'
+    )
+    labels = clusterer.fit_predict(embeddings)
+    return labels
+
+def load_active_events():
+    conn = psycopg2.connect(**DB_CONFIG)
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT id, centroid
+        FROM events
+        WHERE status = 'active';
+    """)
+
+    rows = cursor.fetchall()
+    conn.close()
+
+    events = []
+    for eid, centroid in rows:
+        events.append({
+            "id": eid,
+            "centroid": np.array(centroid)
+        })
+
+    return events
+
+def cosine_similarity(a, b):
+    denom = (np.linalg.norm(a) * np.linalg.norm(b))
+    if denom == 0:
+        return 0
+    return np.dot(a, b) / denom
+
+def match_or_create_events(centroids, events, threshold=0.8):
+    cluster_to_event = {}
+
+    for label, centroid in centroids.items():
+        best_event = None
+        best_score = 0
+
+        for event in events:
+            score = cosine_similarity(centroid, event["centroid"])
+
+            if score > best_score:
+                best_score = score
+                best_event = event
+
+        if best_score >= threshold:
+            cluster_to_event[label] = best_event["id"]
+        else:
+            cluster_to_event[label] = None  # new event
+
+    return cluster_to_event
+
+def update_database(run_id, ids, sources, source_ids, labels, centroids, sizes, cluster_to_event):
+    conn = psycopg2.connect(**DB_CONFIG)
+    cursor = conn.cursor()
+
+
+    for label in centroids.keys():
+        event_id = cluster_to_event[label]
+        centroid = centroids[label]
+        size = sizes[label]
+
+        # CREATE NEW EVENT
+        if event_id is None:
+            cursor.execute("""
+                INSERT INTO events (centroid)
+                VALUES (%s)
+                RETURNING id;
+            """, (centroid.tolist(),))
+            event_id = cursor.fetchone()[0]
+            cluster_to_event[label] = event_id
+            
+
+        # UPDATE EXISTING EVENT
+        else:
+            cursor.execute("""
+                UPDATE events
+                SET centroid = %s,
+                    last_updated = now()
+                WHERE id = %s;
+            """, (centroid.tolist(), event_id))
+
+        # STORE CLUSTER PROPERTIES
+        cursor.execute("""
+            INSERT INTO cluster_properties (
+                cluster_run_id,
+                cluster_label,
+                centroid,
+                size,
+                event_id
+            )
+            VALUES (%s, %s, %s, %s, %s);
+        """, (int(run_id), int(label), centroid.tolist(), int(size), int(event_id)))
+
+    # LINK CONTENT → EVENT
+    for i, (meta_id, label) in enumerate(zip(ids, labels)):
+        if label == -1:
+            continue
+
+        event_id = cluster_to_event[label]
+
+        cursor.execute("""
+            UPDATE content
+            SET event_id = %s
+            WHERE source = %s AND source_id = %s;
+        """, (event_id, sources[i], source_ids[i]))
+
+        # ALSO update metadata
+        cursor.execute("""
+            UPDATE content_metadata
+            SET cluster_run_id = %s,
+                cluster_label = %s
+            WHERE id = %s;
+        """, (run_id, int(label), meta_id))
+
+    conn.commit()
+    conn.close()
+
+
+def compute_clusters_info(embeddings, labels):
+    clusters = {}
+
+    for i, label in enumerate(labels):
+        if label == -1:
+            continue  # skip noise
+        clusters.setdefault(label, []).append(embeddings[i])
+
+    centroids = {
+        int(label): np.mean(vectors, axis=0)
+        for label, vectors in clusters.items()
+    }
+
+    sizes = {
+        int(label): len(vectors)
+        for label, vectors in clusters.items()
+    }
+
+    return centroids, sizes
 
 def store_clusters_run(min_cluster_size, min_samples):
     """Insert a new clustering run and return its run_id."""
@@ -66,59 +218,38 @@ def store_clusters_run(min_cluster_size, min_samples):
     # Retunrn the ID of the new run
     return run_id
 
-def save_cluster_assignments(run_id, ids, labels):
-    """Update text_embeddings with cluster info."""
-    conn = psycopg2.connect(**DB_CONFIG)
-    cursor = conn.cursor()
-    
-    # For each embedding ID, update its cluster_id and cluster_label
-    for idx, label in zip(ids, labels):
-        cursor.execute("""
-            UPDATE content_metadata
-            SET cluster_run_id = %s, cluster_label = %s
-            WHERE id = %s;
-        """, (run_id, int(label), idx))
-    
-    conn.commit()
-    conn.close()
-
 def main():
-    # 1. Fetch embeddings
-    ids, embeddings = fetch_embeddings()
-    if not embeddings.any():
+
+    print("\n🔍 Starting clustering process...\n")
+    
+    ids, sources, source_ids, embeddings = fetch_recent_embeddings()
+
+    if embeddings is None or len(embeddings) == 0:
         print("No embeddings found.")
         return
-    
-    # 2. Run HDBSCAN
 
-    # Minimum number of points to form a cluster
-    min_cluster_size = 5
-    # Minimum samples in a neighborhood for a point to be a core point
-    min_samples = 1
-    print(f"Running HDBSCAN with min_cluster_size={min_cluster_size}, min_samples={min_samples}")
-    
-    clusterer = hdbscan.HDBSCAN(min_cluster_size=min_cluster_size,
-                                min_samples=min_samples,
-                                metric='euclidean')
-    
-    # Runs the algorithm and gets cluster labels
-    labels = clusterer.fit_predict(embeddings)
-    
-    # 3. Store run info
-    run_id = store_clusters_run(min_cluster_size, min_samples)
-    
-    # 4. Save cluster assignments
-    save_cluster_assignments(run_id, ids, labels)
-    print(f"Clustering done!")
+    labels = run_clustering(embeddings)
 
-    # 5. Print cluster distribution
+    centroids, sizes = compute_clusters_info(embeddings, labels)
 
-    counts = Counter(labels)
+    events = load_active_events()
 
-    print("Cluster distribution:")
-    # Sort: real clusters first, then noise (-1) at the end
-    for cid in sorted(counts.keys(), key=lambda x: (x == -1, x)): # False comes first, True last False<True
-        print(f"Cluster {cid}: {counts[cid]} points")
+    cluster_to_event = match_or_create_events(centroids, events)
+
+    run_id = store_clusters_run(5, 1)
+
+    update_database(
+        run_id,
+        ids,
+        sources,
+        source_ids,
+        labels,
+        centroids,
+        sizes,
+        cluster_to_event
+    )
+
+    print("Clustering + event update completed.")
 
 if __name__ == "__main__":
     main()

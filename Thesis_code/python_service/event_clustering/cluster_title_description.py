@@ -5,6 +5,13 @@ from sentence_transformers import SentenceTransformer
 from transformers import pipeline
 # To connect to PostgreSQL
 import psycopg2
+#  
+import spacy
+
+from geopy.geocoders import Nominatim
+from collections import Counter
+
+import torch, transformers
 
 
 # -------- CONFIG --------
@@ -25,54 +32,77 @@ kw_model = KeyBERT(model=embedding_model)
 
 # BART summarization model 
 summarizer = pipeline(
-    "summarization",
+    "text-generation",
     model="facebook/bart-large-cnn",
     device=-1  # CPU
 )
 
+# Load NLP model
+nlp = spacy.load("en_core_web_sm")
+
+# Geocoder
+geolocator = Nominatim(user_agent="thesis_app")
 
 
-def fetch_clusters_for_run(run_id):
-    """Return all distinct cluster labels for a run (excluding noise)."""
+def fetch_events_without_metadata():
     conn = psycopg2.connect(**DB_CONFIG)
     cursor = conn.cursor()
 
-    # Exclude outliers labeled as -1
     cursor.execute("""
-        SELECT DISTINCT cluster_label
-        FROM content_metadata
-        WHERE cluster_run_id = %s
-          AND cluster_label != -1; 
-    """, (run_id,))
+        SELECT id
+        FROM events
+        WHERE title IS NULL
+        OR latitude IS NULL
+        OR longitude IS NULL;
+    """)
 
-    # Cluster labels in a list
-    clusters = [r[0] for r in cursor.fetchall()]
+    events = [r[0] for r in cursor.fetchall()]
     conn.close()
 
-    return clusters
+    return events
 
-
-
-
-def fetch_cluster_texts(run_id, cluster_label, limit=20):
+def fetch_event_texts(event_id, limit=50):
     conn = psycopg2.connect(**DB_CONFIG)
     cursor = conn.cursor()
 
     cursor.execute("""
         SELECT text
-        FROM content_metadata
-        WHERE cluster_run_id = %s
-          AND cluster_label = %s
+        FROM content
+        WHERE event_id = %s
+        ORDER BY created_at DESC
         LIMIT %s;
-    """, (run_id, cluster_label, limit))
+    """, (event_id, limit))
 
     texts = [r[0] for r in cursor.fetchall()]
     conn.close()
-
     return texts
 
 
-def generate_cluster_title(texts):
+def store_event_metadata(event_id, title, description):
+    conn = psycopg2.connect(**DB_CONFIG)
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        UPDATE events
+        SET title = %s,
+            description = %s,
+            last_updated = now()
+        WHERE id = %s;
+    """, (title, description, event_id))
+
+    conn.commit()
+    conn.close()
+
+#Bring the clusters that need a title and description, excluding the noise cluster (-1)
+
+
+
+
+# Bring the texts of posts from each cluster
+
+# Make a title for the cluster by extracting keywords from the combined texts of the cluster's posts. 
+# We use KeyBERT to extract keywords and keyphrases, and we take the top 3 as the title. If no keywords are found, we return "Unknown event".
+def generate_event_title(texts):
     combined_text = " ".join(texts)
 
     keywords = kw_model.extract_keywords(
@@ -88,86 +118,136 @@ def generate_cluster_title(texts):
     return ", ".join(k[0] for k in keywords[:3])
 
 
-def generate_cluster_description(texts):
+# Generate a description for the cluster by summarizing the combined texts of the cluster's posts. 
+# We use BART to summarize the text, and we limit the summary to 40 words. If the combined text is too long, we truncate it to 3000 characters before summarizing.
+def generate_event_description(texts):
     combined_text = " ".join(texts)[:3000]
 
-    summary = summarizer(
-        combined_text,
-        max_length=41,
-        min_length=13,
-        do_sample=False
-    )[0]["summary_text"]
+    try:
+        summary = summarizer(
+            combined_text,
+            max_length=41,
+            min_length=13,
+            do_sample=False
+        )[0]["generated_text"]
+    except Exception:
+        return "Summary unavailable"
 
     return summary
 
+# Store the generated title and description in the database, linked to the cluster run and cluster label. 
+# If a record for this cluster already exists, we update it with the new title and description.
 
-def store_cluster_metadata(run_id, cluster_label, title, description):
+
+
+# Get the latest clustering run ID from the database. This assumes that there is at least one run in the database, and that runs are ordered by their creation time. 
+# If no runs are found, we raise an error.
+
+
+
+
+
+
+def extract_locations(texts):
+    locations = []
+
+    for text in texts:
+        doc = nlp(text)
+
+        for ent in doc.ents:
+            if ent.label_ in ["GPE", "LOC"]:  # cities, countries, locations
+                locations.append(ent.text)
+
+    return locations
+
+
+def get_best_location(locations):
+    if not locations:
+        return None
+
+    # Most common location
+    counter = Counter(locations)
+    return counter.most_common(1)[0][0]
+
+
+def geocode_location(location_name):
+    try:
+        loc = geolocator.geocode(location_name)
+        if loc:
+            return loc.latitude, loc.longitude
+    except Exception as e:
+        print("Geocoding error:", e)
+
+    return None, None
+
+
+def update_event_location(event_id, lat, lon):
     conn = psycopg2.connect(**DB_CONFIG)
     cursor = conn.cursor()
 
     cursor.execute("""
-        INSERT INTO cluster_properties (cluster_run_id, cluster_label, title, description)
-        VALUES (%s, %s, %s, %s)
-        ON CONFLICT (cluster_run_id, cluster_label)
-        DO UPDATE SET
-            title = EXCLUDED.title,
-            description = EXCLUDED.description;
-    """, (run_id, cluster_label, title, description))
+        UPDATE events
+        SET latitude = %s,
+            longitude = %s,
+            last_updated = now()
+        WHERE id = %s;
+    """, (lat, lon, event_id))
 
     conn.commit()
     conn.close()
 
 
-
-def get_latest_run_id():
-    conn = psycopg2.connect(**DB_CONFIG)
-    cursor = conn.cursor()
-
-    cursor.execute("""
-        SELECT id
-        FROM clusters_run
-        ORDER BY created_at DESC
-        LIMIT 1;
-    """)
-
-    row = cursor.fetchone()
-    conn.close()
-
-    if row is None:
-        raise RuntimeError("No clustering runs found.")
-
-    return row[0]
-
-
-
-
+# Main function to orchestrate the process: get the latest run ID, fetch clusters, generate titles and descriptions, and store them in the database.
 def main():
 
-    
-    run_id = get_latest_run_id()
-    print(f"Using clustering run {run_id}")
+    print("\n🔍 Starting title/description generation...\n")
+    print(torch.__version__)
+    print(transformers.__version__)
+    event_ids = fetch_events_without_metadata()
 
-    cluster_labels = fetch_clusters_for_run(run_id)
-
-    if not cluster_labels:
-        print("No clusters found.")
+    if not event_ids:
+        print("No events need metadata.")
         return
 
-    print(f"Generating metadata for {len(cluster_labels)} clusters")
+    print(f"Generating metadata for {len(event_ids)} events")
 
-    for label in cluster_labels:
-        texts = fetch_cluster_texts(run_id, label)
+    for event_id in event_ids:
+        texts = fetch_event_texts(event_id)
 
-        if len(texts) < 3:
-            print(f"Skipping cluster {label} (too small)")
+        if not texts:
+            print(f"No texts found for event {event_id} (no texts)")
             continue
 
-        title = generate_cluster_title(texts)
-        description = generate_cluster_description(texts)
+        if len(texts) < 5:
+            print(f"Skipping event {event_id} (too small)")
+            continue
+        
+        # --------TITLE AND DESCRIPTION--------
+        title = generate_event_title(texts)
+        description = generate_event_description(texts)
 
-        store_cluster_metadata(run_id, label, title, description)
+        store_event_metadata(event_id, title, description)
 
-        print(f"Cluster {label} processed")
+        # --------LOCATION--------
+        locations = extract_locations(texts)
+
+        if not locations:
+            print(f"No location found for event {event_id}")
+            continue
+
+        best_location = get_best_location(locations)
+
+        lat, lon = geocode_location(best_location)
+
+        if lat is None:
+            print(f"Geocoding failed for {best_location}")
+            continue
+
+        update_event_location(event_id, lat, lon)
+
+        print(f"Event {event_id} → {best_location} ({lat}, {lon})")
+
+        print(f"Event {event_id} processed")
 
 
 
