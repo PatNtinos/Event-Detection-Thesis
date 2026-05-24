@@ -54,17 +54,30 @@ function App() {
   return (
     <div className="app">
       <div className="sidebar">
-        <h2>Events</h2>
+        <h2>Atlas Events</h2>
 
         {eventsData.map((event) => (
           <div
             key={event.id}
             className={`event-item ${selectedEvent?.id === event.id ? "active" : ""}`}
-            onClick={() => setSelectedEvent(event)}
+            onClick={() => {
+              if (selectedEvent?.id === event.id) {
+                setSelectedEvent(null)
+              } else {
+                setSelectedEvent(event)
+              }
+            }}
           >
             <h3>{event.title}</h3>
-            <p>{event.description}</p>
-            <span className="event-date">{event.date}</span>
+            {selectedEvent?.id === event.id && (
+                <>
+                  <p>{event.description}</p>
+
+                  <span className="event-date">
+                    {new Date(event.date).toLocaleDateString()}
+                  </span>
+                </>
+            )}
           </div>
         ))}
       </div>

@@ -43,8 +43,10 @@
   background: #2a2a2a;
   border-radius: 10px;
   cursor: pointer;
-  transition: 0.2s ease;
+  transition: 0.3s ease;
+  overflow: hidden;
   text-align: left;
+  background: rgba(255, 255, 255, 0.05);
   border: 1px solid #444;
 }
 
@@ -66,6 +68,7 @@
 
 .event-item.active {
   background: #4a90e2;
+  transform: scale(1.02);
 }
 
 .event-date {
