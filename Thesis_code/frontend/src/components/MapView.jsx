@@ -43,7 +43,7 @@ function MapView({ events, selectedEvent, setSelectedEvent }) {
     <MapContainer
       center={[20, 0]}
       zoom={2}
-      minZoom={2.3}
+      minZoom={2}
       maxBounds={[[-85, -180], [85, 180]]}
       maxBoundsViscosity={1.0}
       worldCopyJump={true}
