@@ -45,6 +45,13 @@ const eventsData = [
     description: "Event in NYC",
     date: "2026-05-17",
     position: [40.7128, -74.0060]
+  },
+    {
+    id: 7,
+    title: "somewhere Event",
+    description: "Event in somewhere",
+    date: "2026-05-17",
+    position: [20.7128, -30.0060]
   }
 ]
 
@@ -54,7 +61,7 @@ function App() {
   return (
     <div className="app">
       <div className="sidebar">
-        <h2>Atlas Events</h2>
+        <h2>AtlasEvents</h2>
 
         {eventsData.map((event) => (
           <div
