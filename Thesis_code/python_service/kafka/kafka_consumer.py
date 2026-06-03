@@ -1,21 +1,15 @@
 # We need the KafkaConsumer class
+import os
+
 from kafka import KafkaConsumer
 # To handle the JSON messages
 import json
 # To connect to PostgreSQL
 import psycopg2
 
-
+DATABASE_URL = os.getenv("DATABASE_URL")
 # Connect to PostgreSQL
-conn = psycopg2.connect(
-    # PostgreSQL credentials
-    dbname="thesis_db",
-    user="thesis_user",
-    password="thesis_pass",
-    # PostgreSQL host and port
-    host="localhost",
-    port=5432
-)
+conn = psycopg2.connect(DATABASE_URL)
 # Create a cursor object to interact with the database
 cursor = conn.cursor()
 

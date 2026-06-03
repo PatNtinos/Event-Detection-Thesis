@@ -1,4 +1,6 @@
 # To connect to PostgreSQL
+import os
+
 import psycopg2
 # For HDBSCAN clustering
 import hdbscan
@@ -9,18 +11,12 @@ from collections import Counter
 
 # -------- CONFIG --------
 # Database connection parameters to login to PostgreSQL
-DB_CONFIG = {
-    "dbname": "thesis_db",
-    "user": "thesis_user",
-    "password": "thesis_pass",
-    "host": "localhost",
-    "port": 5432
-}
+DATABASE_URL = os.getenv("DATABASE_URL")
 
 def fetch_recent_embeddings():
     """Fetch embeddings from the database."""
     # Connect with the DB
-    conn = psycopg2.connect(**DB_CONFIG)
+    conn = psycopg2.connect(DATABASE_URL)
     # Create a cursor to execute queries
     cursor = conn.cursor()
     
@@ -65,7 +61,7 @@ def run_clustering(embeddings):
     return labels
 
 def load_active_events():
-    conn = psycopg2.connect(**DB_CONFIG)
+    conn = psycopg2.connect(DATABASE_URL)
     cursor = conn.cursor()
 
     cursor.execute("""
@@ -114,7 +110,7 @@ def match_or_create_events(centroids, events, threshold=0.8):
     return cluster_to_event
 
 def update_database(run_id, ids, sources, source_ids, labels, centroids, sizes, cluster_to_event):
-    conn = psycopg2.connect(**DB_CONFIG)
+    conn = psycopg2.connect(DATABASE_URL)
     cursor = conn.cursor()
 
 
@@ -202,7 +198,7 @@ def compute_clusters_info(embeddings, labels):
 
 def store_clusters_run(min_cluster_size, min_samples):
     """Insert a new clustering run and return its run_id."""
-    conn = psycopg2.connect(**DB_CONFIG)
+    conn = psycopg2.connect(DATABASE_URL)
     cursor = conn.cursor()
     
     #Insert the new run with the parameters (defined in main)

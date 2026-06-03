@@ -1,4 +1,6 @@
 # To extract keywords from texts
+import os
+
 from keybert import KeyBERT
 from sentence_transformers import SentenceTransformer
 # To load Bart for the summarization
@@ -16,13 +18,7 @@ import torch, transformers
 
 # -------- CONFIG --------
 # Database connection parameters to login to PostgreSQL
-DB_CONFIG = {
-    "dbname": "thesis_db",
-    "user": "thesis_user",
-    "password": "thesis_pass",
-    "host": "localhost",
-    "port": 5432
-}
+DATABASE_URL = os.getenv("DATABASE_URL")
 
 # Embedding model for KeyBERT
 embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
@@ -45,7 +41,7 @@ geolocator = Nominatim(user_agent="thesis_app")
 
 
 def fetch_events_without_metadata():
-    conn = psycopg2.connect(**DB_CONFIG)
+    conn = psycopg2.connect(DATABASE_URL)
     cursor = conn.cursor()
 
     cursor.execute("""
@@ -62,7 +58,7 @@ def fetch_events_without_metadata():
     return events
 
 def fetch_event_texts(event_id, limit=50):
-    conn = psycopg2.connect(**DB_CONFIG)
+    conn = psycopg2.connect(DATABASE_URL)
     cursor = conn.cursor()
 
     cursor.execute("""
@@ -79,7 +75,7 @@ def fetch_event_texts(event_id, limit=50):
 
 
 def store_event_metadata(event_id, title, description):
-    conn = psycopg2.connect(**DB_CONFIG)
+    conn = psycopg2.connect(DATABASE_URL)
     cursor = conn.cursor()
 
     cursor.execute("""
@@ -182,7 +178,7 @@ def geocode_location(location_name):
 
 
 def update_event_location(event_id, lat, lon):
-    conn = psycopg2.connect(**DB_CONFIG)
+    conn = psycopg2.connect(DATABASE_URL)
     cursor = conn.cursor()
 
     cursor.execute("""

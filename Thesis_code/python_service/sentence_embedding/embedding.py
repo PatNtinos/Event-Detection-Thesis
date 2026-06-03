@@ -1,4 +1,6 @@
 # Library to connect to PostgreSQL
+import os
+
 import psycopg2
 # Library for sentence embeddings
 from sentence_transformers import SentenceTransformer
@@ -14,13 +16,7 @@ while True:
 """
 # -------- CONFIG --------
 # Database connection parameters to login to PostgreSQL
-DB_CONFIG = {
-    "dbname": "thesis_db",
-    "user": "thesis_user",
-    "password": "thesis_pass",
-    "host": "localhost",
-    "port": 5432
-}
+DATABASE_URL = os.getenv("DATABASE_URL")
 
 # What SBERT model to use
 MODEL_NAME = "all-MiniLM-L6-v2"
@@ -43,7 +39,7 @@ def main():
     print("\n🔍 Starting embedding process...\n")
     # 1. Connect to database
     # to connect to PostgreSQL
-    conn = psycopg2.connect(**DB_CONFIG)
+    conn = psycopg2.connect(DATABASE_URL)
     # to execute queries
     cursor = conn.cursor()
 

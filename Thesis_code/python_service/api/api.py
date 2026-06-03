@@ -1,3 +1,5 @@
+import os
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import psycopg2
@@ -12,18 +14,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-DB_CONFIG = {
-    "dbname": "thesis_db",
-    "user": "thesis_user",
-    "password": "thesis_pass",
-    "host": "localhost",
-    "port": 5432
-}
+DATABASE_URL = "postgresql://neondb_owner:npg_Hi3ntkgCz1jv@ep-solitary-cloud-alrh240q-pooler.c-3.eu-central-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require" #os.getenv("DATABASE_URL")
 
 @app.get("/events")
 def get_events():
 
-    conn = psycopg2.connect(**DB_CONFIG)
+    conn = psycopg2.connect(DATABASE_URL)
 
     cur = conn.cursor()
 
