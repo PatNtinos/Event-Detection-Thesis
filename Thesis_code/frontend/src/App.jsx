@@ -12,7 +12,7 @@ function App() {
   const [events, setEvents] = useState([])
 
   useEffect(() => {
-    fetch("http://localhost:8000/events")
+    fetch("https://atlas-6l2c.onrender.com/events")
       .then(res => res.json())
       .then(data => setEvents(data))
       .catch(err => console.error(err))
