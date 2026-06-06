@@ -74,7 +74,15 @@ function MapView({ events, selectedEvent, setSelectedEvent }) {
             <Popup>
               <h3>{event.title}</h3>
               <p>{event.description}</p>
-              <small>{new Date(event.date).toLocaleDateString()}</small>
+              <small>                    
+                      {new Date(event.first_seen).toLocaleString("en-GB", {
+                      day: "2-digit",
+                      month: "2-digit",
+                      year: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                      hour12: false
+              })}</small>
             </Popup>
           </Marker>
         ))}
