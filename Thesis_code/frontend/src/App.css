@@ -9,11 +9,14 @@
 
 .sidebar {
   width: 320px;
+  flex: 1;
+  min-width: 0;
+  max-width: 320px;
   height: 100%;
   padding: 16px;
   overflow-y: auto;
 
-  /* glass effect */
+
   background: rgba(20, 20, 20, 0.55);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
@@ -22,8 +25,14 @@
   color: white;
 }
 
+.sidebar h2 {
+  text-align: center;
+  width: 100%;
+}
+
 .map {
   flex: 1;
+  min-width: 0;
   height: 100%;
 }
 

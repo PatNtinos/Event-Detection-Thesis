@@ -14,14 +14,19 @@ function App() {
   useEffect(() => {
     fetch("https://atlas-6l2c.onrender.com/events")
       .then(res => res.json())
-      .then(data => setEvents(data))
+      .then(data => {
+        const sorted = data.sort(
+          (a, b) => new Date(b.first_seen) - new Date(a.first_seen)
+        )
+        setEvents(sorted)
+      })
       .catch(err => console.error(err))
   }, [])
 
   return (
     <div className="app">
       <div className="sidebar">
-        <h2>AtlasEvents</h2>
+        <h2>Atlas Events</h2>
 
         {events.map((event) => (
           <div
@@ -41,7 +46,14 @@ function App() {
                   <p>{event.description}</p>
 
                   <span className="event-date">
-                    {new Date(event.date).toLocaleDateString()}
+                    {new Date(event.first_seen).toLocaleString("en-GB", {
+                      day: "2-digit",
+                      month: "2-digit",
+                      year: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                      hour12: false
+                    })}
                   </span>
                 </>
             )}
