@@ -6,6 +6,8 @@ from kafka import KafkaConsumer
 import json
 # To connect to PostgreSQL
 import psycopg2
+from dotenv import load_dotenv
+load_dotenv()
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 # Connect to PostgreSQL
