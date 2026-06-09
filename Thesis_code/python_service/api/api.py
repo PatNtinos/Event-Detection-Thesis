@@ -16,10 +16,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-DATABASE_URL = os.getenv("DATABASE_URL")
-print("DATABASE_URL =", DATABASE_URL)
 @app.get("/events")
 def get_events():
+
+    DATABASE_URL = os.getenv("DATABASE_URL")
+
+    if not DATABASE_URL:
+        return {"error": "DATABASE_URL missing"}
 
     conn = psycopg2.connect(DATABASE_URL)
 
