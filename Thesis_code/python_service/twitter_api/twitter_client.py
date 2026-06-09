@@ -1,5 +1,6 @@
 import os
 import requests
+import finnhub
 from dotenv import load_dotenv
 from datetime import datetime, timezone
 
@@ -8,7 +9,12 @@ load_dotenv()
 
 WEBZ_API_KEY = os.getenv("WEBZ_API_KEY")
 NEWS_API_KEY = os.getenv("NEWS_API_KEY")
-
+MEDIASTACK_API_KEY = os.getenv("MEDIASTACK_API_KEY")
+GNEWS_API_KEY = os.getenv("GNEWS_API_KEY")
+NEWSDATA_API_KEY = os.getenv("NEWSDATA_API_KEY")
+CURRENTS_API_KEY = os.getenv("CURRENTS_API_KEY")
+GUARDIAN_API_KEY = os.getenv("GUARDIAN_API_KEY")
+FINNHUB_API_KEY = os.getenv("FINNHUB_API_KEY")
 
 # ========================
 # COMMON EVENT FORMAT
@@ -330,8 +336,141 @@ def fetch_guardian(limit=50):
         print(f"⚠️ Guardian failed: {e}")
         return []
 
+# ========================
+# MEDIASTACK FETCHER
+# ========================
+
+def fetch_mediastack(limit=5):
+
+    url = "http://api.mediastack.com/v1/news"
+
+    params = {
+        "access_key": MEDIASTACK_API_KEY,
+
+        # Event-focused query
+        "keywords": (
+            "earthquake OR disaster OR war OR protest "
+            "OR crash OR explosion OR emergency OR flood"
+        ),
+
+        "languages": "en",
+
+        "sort": "published_desc",
+
+        "limit": limit
+    }
+
+    try:
+        response = requests.get(url, params=params)
+
+        if response.status_code != 200:
+            print(f"⚠️ Mediastack error {response.status_code}")
+            print(response.text)
+            return []
+
+        data = response.json()
+
+        events = []
+
+        for article in data.get("data", []):
+
+            # skip empty titles
+            if not article.get("title"):
+                continue
+
+            events.append(normalize_event(
+                source="mediastack",
+                source_id=article.get("url"),  # best unique ID
+                text=article.get("description") or article.get("title"),
+                created_at=datetime.now(timezone.utc).isoformat(),
+                lang=article.get("language", "en"),
+            ))
+
+        return events
+
+    except Exception as e:
+        print(f"⚠️ Mediastack failed: {e}")
+        return []
 
 
+# ========================
+# GNEWS FETCHER
+# ========================
+
+def fetch_gnews(limit=10):
+
+    url = "https://gnews.io/api/v4/search"
+
+    params = {
+        "q": (
+            "earthquake OR disaster OR war OR protest "
+            "OR explosion OR emergency OR crash OR flood"
+        ),
+        "lang": "en",
+        "max": limit,
+        "apikey": GNEWS_API_KEY
+    }
+
+    try:
+        response = requests.get(url, params=params)
+
+        if response.status_code != 200:
+            print(f"⚠️ GNews error {response.status_code}")
+            print(response.text)
+            return []
+
+        data = response.json()
+
+        events = []
+
+        for article in data.get("articles", []):
+
+            if not article.get("title"):
+                continue
+
+            events.append(normalize_event(
+                source="gnews",
+                source_id=article.get("id"),
+                text=article.get("description") or article.get("title"),
+                created_at=datetime.now(timezone.utc).isoformat(),
+                lang="en",
+            ))
+
+        return events
+
+    except Exception as e:
+        print(f"⚠️ GNews failed: {e}")
+        return []
+    
+
+# ========================
+# FINNHUB FETCHER
+# ========================
+
+def fetch_finnhub(limit=20):
+
+    try:
+        finnhub_client = finnhub.Client(api_key=FINNHUB_API_KEY)
+
+        data = finnhub_client.general_news("general")
+
+        events = []
+
+        for article in data[:limit]:
+
+            events.append(normalize_event(
+                source="finnhub",
+                source_id=article.get("id"),
+                text=article.get("summary"),
+                created_at=datetime.now(timezone.utc).isoformat(),
+                lang="en"
+            ))
+
+        return events
+
+    except Exception as e:
+        print(f"⚠️ Finnhub failed: {e}")
+        return []
 
 # ========================
 # MAIN AGGREGATOR
@@ -345,6 +484,10 @@ def fetch_all_events():
     events.extend(fetch_newsapi())
     events.extend(fetch_newsdata())
     events.extend(fetch_currents())
+    events.extend(fetch_guardian())
+    events.extend(fetch_mediastack())
+    events.extend(fetch_gnews())
+    events.extend(fetch_finnhub())
 
     return events
 

@@ -14,7 +14,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-DATABASE_URL = "postgresql://neondb_owner:npg_Hi3ntkgCz1jv@ep-solitary-cloud-alrh240q-pooler.c-3.eu-central-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require" #os.getenv("DATABASE_URL")
+DATABASE_URL = os.getenv("DATABASE_URL")
 
 @app.get("/events")
 def get_events():
@@ -26,6 +26,7 @@ def get_events():
     cur.execute("""
         SELECT id, title, description, first_seen, latitude, longitude
         FROM events
+        WHERE first_seen >= NOW() - INTERVAL '24 hours'
     """)
 
     rows = cur.fetchall()

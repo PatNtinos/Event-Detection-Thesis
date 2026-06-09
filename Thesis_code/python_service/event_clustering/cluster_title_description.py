@@ -28,7 +28,7 @@ kw_model = KeyBERT(model=embedding_model)
 
 # BART summarization model 
 summarizer = pipeline(
-    "text-generation",
+    "summarization",
     model="facebook/bart-large-cnn",
     device=-1  # CPU
 )
@@ -57,7 +57,7 @@ def fetch_events_without_metadata():
 
     return events
 
-def fetch_event_texts(event_id, limit=50):
+def fetch_event_texts(event_id, limit=20):
     conn = psycopg2.connect(DATABASE_URL)
     cursor = conn.cursor()
 
@@ -98,34 +98,48 @@ def store_event_metadata(event_id, title, description):
 
 # Make a title for the cluster by extracting keywords from the combined texts of the cluster's posts. 
 # We use KeyBERT to extract keywords and keyphrases, and we take the top 3 as the title. If no keywords are found, we return "Unknown event".
-def generate_event_title(texts):
-    combined_text = " ".join(texts)
+def generate_event_title(texst):
+    combined_text = "\n".join(texts)
 
-    keywords = kw_model.extract_keywords(
-        combined_text,
-        keyphrase_ngram_range=(1, 3),
-        stop_words="english",
-        top_n=5
+    prompt = (
+        "You are a news editor."
+        "Write a short, clear news headline (max 12 words) "
+        "based on the following events:\n\n"
+        + combined_text
     )
 
-    if not keywords:
+    try:
+        result = summarizer(
+            prompt,
+            max_length=20,
+            min_length=5,
+            do_sample=False
+        )[0]["summary_text"]
+    except Exception:
         return "Unknown event"
 
-    return ", ".join(k[0] for k in keywords[:3])
+    return result
 
 
 # Generate a description for the cluster by summarizing the combined texts of the cluster's posts. 
 # We use BART to summarize the text, and we limit the summary to 40 words. If the combined text is too long, we truncate it to 3000 characters before summarizing.
 def generate_event_description(texts):
-    combined_text = " ".join(texts)[:3000]
+    combined_text = "\n".join(texts)
+
+    prompt = (
+        "You are a news editor."
+        "Write a brief news summary (max 40 words)"
+        "based on the following events:\n\n"
+        + combined_text
+    )
 
     try:
         summary = summarizer(
-            combined_text,
-            max_length=41,
+            prompt,
+            max_length=40,
             min_length=13,
             do_sample=False
-        )[0]["generated_text"]
+        )[0]["summary_text"]
     except Exception:
         return "Summary unavailable"
 

@@ -53,8 +53,8 @@ def fetch_recent_embeddings():
 
 def run_clustering(embeddings):
     clusterer = hdbscan.HDBSCAN(
-        min_cluster_size=5,
-        min_samples=1,
+        min_cluster_size=8,
+        min_samples=3,
         metric='euclidean'
     )
     labels = clusterer.fit_predict(embeddings)
