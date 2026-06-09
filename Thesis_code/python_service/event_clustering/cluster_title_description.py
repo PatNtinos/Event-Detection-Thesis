@@ -14,6 +14,8 @@ from geopy.geocoders import Nominatim
 from collections import Counter
 
 import torch, transformers
+from dotenv import load_dotenv
+load_dotenv()
 
 
 # -------- CONFIG --------

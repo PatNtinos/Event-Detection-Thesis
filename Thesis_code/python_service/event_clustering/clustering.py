@@ -8,6 +8,8 @@ import hdbscan
 import numpy as np
 # To present how many clusters and with how many members
 from collections import Counter
+from dotenv import load_dotenv
+load_dotenv()
 
 # -------- CONFIG --------
 # Database connection parameters to login to PostgreSQL

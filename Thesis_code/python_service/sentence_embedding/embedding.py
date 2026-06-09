@@ -4,6 +4,8 @@ import os
 import psycopg2
 # Library for sentence embeddings
 from sentence_transformers import SentenceTransformer
+from dotenv import load_dotenv
+load_dotenv()
 
 """
 # Import time module to run the embedding process periodically

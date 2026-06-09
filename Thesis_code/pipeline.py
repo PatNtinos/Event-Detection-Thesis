@@ -31,7 +31,7 @@ def main():
         time.sleep(60)
 
         # 4️⃣ Run clustering
-        subprocess.run(["python", "-m", "python_service.event_clustering.cluster"])
+        subprocess.run(["python", "-m", "python_service.event_clustering.clustering"])
         time.sleep(60)
 
         # 5️⃣ Run title + description generation
