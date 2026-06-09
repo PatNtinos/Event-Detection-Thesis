@@ -17,7 +17,7 @@ app.add_middleware(
 )
 
 DATABASE_URL = os.getenv("DATABASE_URL")
-
+print("DATABASE_URL =", DATABASE_URL)
 @app.get("/events")
 def get_events():
 

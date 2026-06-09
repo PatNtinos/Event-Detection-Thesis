@@ -100,7 +100,7 @@ def store_event_metadata(event_id, title, description):
 
 # Make a title for the cluster by extracting keywords from the combined texts of the cluster's posts. 
 # We use KeyBERT to extract keywords and keyphrases, and we take the top 3 as the title. If no keywords are found, we return "Unknown event".
-def generate_event_title(texst):
+def generate_event_title(texts):
     combined_text = "\n".join(texts)
 
     prompt = (
