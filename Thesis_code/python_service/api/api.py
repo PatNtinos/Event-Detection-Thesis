@@ -28,10 +28,11 @@ def get_events():
 
     cur = conn.cursor()
 
+    # Turn interval to 24 when running in production
     cur.execute("""
         SELECT id, title, description, first_seen, latitude, longitude
         FROM events
-        WHERE first_seen >= NOW() - INTERVAL '24 hours'
+        WHERE first_seen >= NOW() - INTERVAL '100 hours' 
     """)
 
     rows = cur.fetchall()

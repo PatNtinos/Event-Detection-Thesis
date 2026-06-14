@@ -17,6 +17,10 @@ import torch, transformers
 from dotenv import load_dotenv
 load_dotenv()
 
+# No position events go to Antarctica
+DEFAULT_LAT = -69.6354154
+DEFAULT_LON = 0.0
+
 
 # -------- CONFIG --------
 # Database connection parameters to login to PostgreSQL
@@ -245,6 +249,7 @@ def main():
 
         if not locations:
             print(f"No location found for event {event_id}")
+            update_event_location(event_id, DEFAULT_LAT, DEFAULT_LON)
             continue
 
         best_location = get_best_location(locations)

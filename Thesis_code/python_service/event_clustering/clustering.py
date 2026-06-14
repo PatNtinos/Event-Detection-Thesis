@@ -105,8 +105,17 @@ def match_or_create_events(centroids, events, threshold=0.8):
                 best_event = event
 
         if best_score >= threshold:
+            # The printings are for review purposes
+            print(
+                f"🔄 Cluster {label} matched Event {best_event['id']} "
+                f"(similarity={best_score:.3f})"
+            )
             cluster_to_event[label] = best_event["id"]
         else:
+            print(
+                f"🆕 Cluster {label} is a NEW event "
+                f"(best similarity={best_score:.3f})"
+            )    
             cluster_to_event[label] = None  # new event
 
     return cluster_to_event
@@ -121,19 +130,36 @@ def update_database(run_id, ids, sources, source_ids, labels, centroids, sizes, 
         centroid = centroids[label]
         size = sizes[label]
 
+       
         # CREATE NEW EVENT
         if event_id is None:
+            print(
+                f"🆕 Creating new event from cluster {label}"
+                f"({size} articles)"   #Review purposes
+            )
             cursor.execute("""
                 INSERT INTO events (centroid)
                 VALUES (%s)
                 RETURNING id;
             """, (centroid.tolist(),))
             event_id = cursor.fetchone()[0]
+            print(
+                f"🆕 Creating new Event {event_id} "
+                f"from cluster {label} "
+                f"({size} articles)"
+            )
+            print(f"✅ Event {event_id} created") #Review purposes
             cluster_to_event[label] = event_id
             
 
         # UPDATE EXISTING EVENT
         else:
+            # Review purposes
+            print(
+                f"🔄 Updating Event {event_id} "
+                f"from cluster {label} "
+                f"({size} articles)"
+            )
             cursor.execute("""
                 UPDATE events
                 SET centroid = %s,
@@ -229,6 +255,10 @@ def main():
     labels = run_clustering(embeddings)
 
     centroids, sizes = compute_clusters_info(embeddings, labels)
+
+    # Review Purposes
+    print(f"Found {len(centroids)} clusters")
+    print(Counter(labels))
 
     events = load_active_events()
 
