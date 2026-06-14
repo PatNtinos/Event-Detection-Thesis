@@ -35,7 +35,7 @@ def normalize_event(source, source_id, text, created_at=None, lang=None, url=Non
 # ========================
 def fetch_reddit(limit=50):
     url = "https://www.reddit.com/r/news.json"
-    headers = {"User-Agent": "event-pipeline-test"}
+    headers = {"User-Agent": "linux:event-pipeline-test:v1.0 (by /u/Chance_Ad4466)"}
 
     try:
         response = requests.get(url, headers=headers, params={"limit": limit})
@@ -342,7 +342,7 @@ def fetch_guardian(limit=50):
 
 def fetch_mediastack(limit=5):
 
-    url = "http://api.mediastack.com/v1/news"
+    url = "https://api.mediastack.com/v1/news"
 
     params = {
         "access_key": MEDIASTACK_API_KEY,

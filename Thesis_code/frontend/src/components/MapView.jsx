@@ -14,30 +14,40 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
 })
 
-function FlyToEvent({ event }) {
+function FlyToEvent({ event, markersRef }) {
   const map = useMap()
+  const pendingRef = useRef(null)
 
   useEffect(() => {
-    if (event) {
-      map.flyTo(event.position, 6, { duration: 1.3 })
+    if (!event) return
+
+    pendingRef.current = event.id
+
+    map.flyTo(event.position, 6, { duration: 1.3 })
+
+    const onMoveEnd = () => {
+      const id = pendingRef.current
+      if (!id) return
+
+      const marker = markersRef.current[id]
+      if (marker) {
+        marker.openPopup()
+      }
+      pendingRef.current = null
     }
-  }, [event, map])
+
+    map.once('moveend', onMoveEnd)
+
+    return () => {
+      map.off('moveend', onMoveEnd)
+    }
+  }, [event, map, markersRef])
 
   return null
 }
 
 function MapView({ events, selectedEvent, setSelectedEvent }) {
   const markersRef = useRef({})
-
-  useEffect(() => {
-    const marker = markersRef.current[selectedEvent?.id]
-    
-    if (marker) {
-      setTimeout(() => {
-        marker.openPopup()
-      }, 50)
-    }
-  }, [selectedEvent])
 
   return (
     <MapContainer
@@ -87,7 +97,7 @@ function MapView({ events, selectedEvent, setSelectedEvent }) {
           </Marker>
         ))}
       </MarkerClusterGroup>
-      <FlyToEvent event={selectedEvent} />
+      <FlyToEvent event={selectedEvent} markersRef={markersRef} />
     </MapContainer>
   )
 }

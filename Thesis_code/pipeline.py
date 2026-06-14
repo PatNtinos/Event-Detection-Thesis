@@ -1,9 +1,6 @@
 import subprocess
 import time
 
-from sympy import true
-
-
 
 def run_module(module_path):
     print(f"\n🚀 Starting {module_path}\n")
@@ -21,7 +18,7 @@ def main():
     producer = run_module("python_service.kafka.kafka_producer")
 
    
-    while true:
+    while True:
         
         print("\n⏳ Pipeline offset...\n")
         time.sleep(300)

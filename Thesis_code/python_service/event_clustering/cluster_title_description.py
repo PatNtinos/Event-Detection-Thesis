@@ -107,22 +107,17 @@ def store_event_metadata(event_id, title, description):
 def generate_event_title(texts):
     combined_text = "\n".join(texts)
 
-    prompt = (
-        "You are a news editor."
-        "Write a short, clear news headline (max 12 words) "
-        "based on the following events:\n\n"
-        + combined_text
-    )
+    combined_text = "\n".join(texts)[:3000]
 
     try:
         result = summarizer(
-            prompt,
-            max_length=20,
+            combined_text,
+            max_length=25,
             min_length=5,
             do_sample=False
         )[0]["summary_text"]
     except Exception:
-        return "Unknown event"
+        return "Title Unavailable"
 
     return result
 
@@ -130,19 +125,13 @@ def generate_event_title(texts):
 # Generate a description for the cluster by summarizing the combined texts of the cluster's posts. 
 # We use BART to summarize the text, and we limit the summary to 40 words. If the combined text is too long, we truncate it to 3000 characters before summarizing.
 def generate_event_description(texts):
-    combined_text = "\n".join(texts)
-
-    prompt = (
-        "You are a news editor."
-        "Write a brief news summary (max 40 words)"
-        "based on the following events:\n\n"
-        + combined_text
-    )
+      
+    combined_text = "\n".join(texts)[:3000]
 
     try:
         summary = summarizer(
-            prompt,
-            max_length=40,
+            combined_text,
+            max_length=62,
             min_length=13,
             do_sample=False
         )[0]["summary_text"]
@@ -249,6 +238,7 @@ def main():
 
         if not locations:
             print(f"No location found for event {event_id}")
+            print(f"Sending it to Antarctica!")
             update_event_location(event_id, DEFAULT_LAT, DEFAULT_LON)
             continue
 
