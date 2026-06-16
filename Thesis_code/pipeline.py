@@ -23,7 +23,7 @@ def main():
     while True:
 
         # 3️⃣ Run embeddings (batch job)
-        embedding_result = subprocess.run(["python", "-m", "python_service.sentence_embedding.embedding"], capture_output=True)
+        embedding_result = subprocess.run(["python", "-m", "python_service.sentence_embedding.embedding"])
         time.sleep(60)
 
         if embedding_result.returncode == 2:
