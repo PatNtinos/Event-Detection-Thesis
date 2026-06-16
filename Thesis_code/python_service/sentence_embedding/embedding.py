@@ -1,5 +1,6 @@
 # Library to connect to PostgreSQL
 import os
+import sys
 
 import psycopg2
 # Library for sentence embeddings
@@ -63,7 +64,7 @@ def main():
     # For debugging
     if not rows:
         print("No new content to embed.")
-        return
+        sys.exit(2)
 
     source_ids = []
     sources = []

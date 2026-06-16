@@ -33,8 +33,8 @@ def normalize_event(source, source_id, text, created_at=None, lang=None, url=Non
 # ========================
 # REDDIT FETCHER
 # ========================
-def fetch_reddit(limit=50):
-    url = "https://www.reddit.com/r/news.json"
+def fetch_reddit(limit=30):
+    url = "https://www.reddit.com/r/news/.json"
     headers = {"User-Agent": "linux:event-pipeline-test:v1.0 (by /u/Chance_Ad4466)"}
 
     try:

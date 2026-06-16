@@ -17,15 +17,19 @@ def main():
     # 2️⃣ Start Kafka producer (data ingestion)
     producer = run_module("python_service.kafka.kafka_producer")
 
+    print("\n⏳ Pipeline offset...\n")
+    time.sleep(300)
    
     while True:
-        
-        print("\n⏳ Pipeline offset...\n")
-        time.sleep(300)
 
         # 3️⃣ Run embeddings (batch job)
-        subprocess.run(["python", "-m", "python_service.sentence_embedding.embedding"])
+        embedding_result = subprocess.run(["python", "-m", "python_service.sentence_embedding.embedding"], capture_output=True)
         time.sleep(60)
+
+        if embedding_result.returncode == 2:
+            print("\n⏳ No new content to embed, skipping clustering and title generation.\n")
+            time.sleep(3600)
+            continue
 
         # 4️⃣ Run clustering
         subprocess.run(["python", "-m", "python_service.event_clustering.clustering"])

@@ -42,28 +42,47 @@ ON CONFLICT (source, source_id) DO NOTHING;
 """
 
 
+def connect_db():
+    conn = psycopg2.connect(DATABASE_URL)
+    cursor = conn.cursor()
+    return conn, cursor
+
+conn, cursor = connect_db()
 
 # For each message received
 for message in consumer:
     content = message.value
     
-    
+    try:
+        cursor.execute(
+            insert_query,
+            (
+                content['source_id'],
+                content['text'], 
+                content.get('created_at'),
+                content["lang"], 
+                content["source"]
+            )
+        )
+
+        conn.commit()
+
+    except Exception as e:
+        print("DB insert error:", e)
+
+        try:
+            conn.colse()
+        except:
+            pass
+        print("Reconnecting to the database...")
+
+        conn,cursor = connect_db()
+        
     # TESTING PURPOSES
     # Print the content id, just to be sure it's working
     #print(f"[{content.get('created_at')}] {content['source_id']}")
 
     # Insert content into PostgreSQL
-    # execute this SQL command
-    try:
-        cursor.execute(insert_query,(
-            content['source_id'],
-            content['text'], 
-            content.get('created_at'),
-            content["lang"], 
-            content["source"]
-        ))
-    except Exception as e:
-        print("DB insert error:", e)
-        conn.rollback()    
+    # execute this SQL command   
     # Save all changes in the transaction
-    conn.commit()
+   

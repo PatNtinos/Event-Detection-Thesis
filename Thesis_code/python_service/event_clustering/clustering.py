@@ -57,7 +57,7 @@ def run_clustering(embeddings):
     clusterer = hdbscan.HDBSCAN(
         min_cluster_size=3,
         min_samples=2,
-        metric='cosine',
+        metric='euclidean',
     )
     labels = clusterer.fit_predict(embeddings)
     return labels
@@ -69,7 +69,7 @@ def load_active_events():
     cursor.execute("""
         SELECT id, centroid
         FROM events
-        AND first_seen >= NOW() - INTERVAL '24 hours';
+        WHERE first_seen >= NOW() - INTERVAL '24 hours';
     """)
 
     rows = cursor.fetchall()

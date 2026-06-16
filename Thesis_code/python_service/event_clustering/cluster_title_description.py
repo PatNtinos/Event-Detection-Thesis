@@ -223,7 +223,7 @@ def main():
             print(f"No texts found for event {event_id} (no texts)")
             continue
 
-        if len(texts) < 5:
+        if len(texts) < 3:
             print(f"Skipping event {event_id} (too small)")
             continue
         
