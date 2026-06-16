@@ -30,9 +30,25 @@ function FlyToEvent({ event, markersRef }) {
       if (!id) return
 
       const marker = markersRef.current[id]
-      if (marker) {
+      if (!marker) return
+
+      // Check if the marker is currently hidden inside a cluster
+      const markerParent = marker.__parent
+      if (markerParent) {
+        const clusterGroup = markerParent._group
+
+        // Zoom into the cluster until the marker is visible (spiderfied/unclustered)
+        clusterGroup.zoomToShowLayer(marker, () => {
+          // This callback fires once the marker is visible
+          setTimeout(() => {
+            marker.openPopup()
+          }, 100) // small delay for spiderfy animation to settle
+        })
+      } else {
+        // Marker is already visible, open directly
         marker.openPopup()
       }
+
       pendingRef.current = null
     }
 
