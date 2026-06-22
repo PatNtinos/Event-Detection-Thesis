@@ -71,18 +71,10 @@ for message in consumer:
         print("DB insert error:", e)
 
         try:
-            conn.colse()
+            conn.close()
         except:
             pass
         print("Reconnecting to the database...")
 
         conn,cursor = connect_db()
-        
-    # TESTING PURPOSES
-    # Print the content id, just to be sure it's working
-    #print(f"[{content.get('created_at')}] {content['source_id']}")
-
-    # Insert content into PostgreSQL
-    # execute this SQL command   
-    # Save all changes in the transaction
    

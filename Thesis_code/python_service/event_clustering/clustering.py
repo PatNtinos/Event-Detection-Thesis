@@ -55,6 +55,8 @@ def fetch_recent_embeddings():
 
 def run_clustering(embeddings):
     clusterer = hdbscan.HDBSCAN(
+        # When changing the parameters here, also change them in the main function
+        # Parameters for HDBSCAN clustering, bigger numbers = stricter clustering, smaller numbers = more clusters
         min_cluster_size=3,
         min_samples=2,
         metric='euclidean',
@@ -245,7 +247,10 @@ def store_clusters_run(min_cluster_size, min_samples):
 def main():
 
     print("\n🔍 Starting clustering process...\n")
-    
+
+    # Cluster model parameters
+    min_cluster_size=3
+    min_samples=2
     ids, sources, source_ids, embeddings = fetch_recent_embeddings()
 
     if embeddings is None or len(embeddings) == 0:
@@ -264,7 +269,7 @@ def main():
 
     cluster_to_event = match_or_create_events(centroids, events)
 
-    run_id = store_clusters_run(5, 1)
+    run_id = store_clusters_run(min_cluster_size, min_samples)
 
     update_database(
         run_id,

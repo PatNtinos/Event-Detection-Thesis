@@ -1,13 +1,13 @@
 # To extract keywords from texts
 import os
-
-from keybert import KeyBERT
+# It isnt used in this verion.
+#from keybert import KeyBERT
 from sentence_transformers import SentenceTransformer
 # To load Bart for the summarization
 from transformers import pipeline
 # To connect to PostgreSQL
 import psycopg2
-#  
+#  For NLP tasks like extracting locations from texts
 import spacy
 
 from geopy.geocoders import Nominatim
@@ -30,7 +30,8 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
 
 # KeyBERT uses embeddings
-kw_model = KeyBERT(model=embedding_model)
+# The keybert model was used to create titles, with keywords. The title weren't appealing so instead we used the same model as the description.
+#kw_model = KeyBERT(model=embedding_model)
 
 # BART summarization model 
 summarizer = pipeline(
@@ -95,17 +96,10 @@ def store_event_metadata(event_id, title, description):
     conn.commit()
     conn.close()
 
-#Bring the clusters that need a title and description, excluding the noise cluster (-1)
 
-
-
-
-# Bring the texts of posts from each cluster
-
-# Make a title for the cluster by extracting keywords from the combined texts of the cluster's posts. 
-# We use KeyBERT to extract keywords and keyphrases, and we take the top 3 as the title. If no keywords are found, we return "Unknown event".
+# Generate a title for the cluster by summarizing the combined texts of the cluster's posts. 
+# Because we use the same model, in events with small context it might be the same. 
 def generate_event_title(texts):
-    combined_text = "\n".join(texts)
 
     combined_text = "\n".join(texts)[:3000]
 
@@ -123,7 +117,6 @@ def generate_event_title(texts):
 
 
 # Generate a description for the cluster by summarizing the combined texts of the cluster's posts. 
-# We use BART to summarize the text, and we limit the summary to 40 words. If the combined text is too long, we truncate it to 3000 characters before summarizing.
 def generate_event_description(texts):
       
     combined_text = "\n".join(texts)[:3000]
@@ -139,19 +132,6 @@ def generate_event_description(texts):
         return "Summary unavailable"
 
     return summary
-
-# Store the generated title and description in the database, linked to the cluster run and cluster label. 
-# If a record for this cluster already exists, we update it with the new title and description.
-
-
-
-# Get the latest clustering run ID from the database. This assumes that there is at least one run in the database, and that runs are ordered by their creation time. 
-# If no runs are found, we raise an error.
-
-
-
-
-
 
 def extract_locations(texts):
     locations = []
@@ -202,12 +182,11 @@ def update_event_location(event_id, lat, lon):
     conn.close()
 
 
-# Main function to orchestrate the process: get the latest run ID, fetch clusters, generate titles and descriptions, and store them in the database.
+# Main function to orchestrate the process: get the latest run ID, fetch clusters, generate titles and descriptions and locations, and store them in the database.
 def main():
 
     print("\n🔍 Starting title/description generation...\n")
-    print(torch.__version__)
-    print(transformers.__version__)
+
     event_ids = fetch_events_without_metadata()
 
     if not event_ids:
@@ -248,6 +227,8 @@ def main():
 
         if lat is None:
             print(f"Geocoding failed for {best_location}")
+            print(f"Sending it to Antarctica!")
+            update_event_location(event_id, DEFAULT_LAT, DEFAULT_LON)
             continue
 
         update_event_location(event_id, lat, lon)

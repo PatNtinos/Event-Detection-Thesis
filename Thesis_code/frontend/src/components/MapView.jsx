@@ -16,46 +16,30 @@ L.Icon.Default.mergeOptions({
 
 function FlyToEvent({ event, markersRef }) {
   const map = useMap()
-  const pendingRef = useRef(null)
 
   useEffect(() => {
     if (!event) return
 
-    pendingRef.current = event.id
+    const marker = markersRef.current[event.id]
+    if (!marker) return
 
-    map.flyTo(event.position, 6, { duration: 1.3 })
+    const markerParent = marker.__parent
 
-    const onMoveEnd = () => {
-      const id = pendingRef.current
-      if (!id) return
-
-      const marker = markersRef.current[id]
-      if (!marker) return
-
-      // Check if the marker is currently hidden inside a cluster
-      const markerParent = marker.__parent
-      if (markerParent) {
-        const clusterGroup = markerParent._group
-
-        // Zoom into the cluster until the marker is visible (spiderfied/unclustered)
-        clusterGroup.zoomToShowLayer(marker, () => {
-          // This callback fires once the marker is visible
-          setTimeout(() => {
-            marker.openPopup()
-          }, 100) // small delay for spiderfy animation to settle
-        })
-      } else {
-        // Marker is already visible, open directly
+    if (markerParent) {
+      // Clustered — let zoomToShowLayer handle pan + zoom in one motion
+      const clusterGroup = markerParent._group
+      clusterGroup.zoomToShowLayer(marker, () => {
+        setTimeout(() => {
+          marker.openPopup()
+        }, 100)
+      })
+    } else {
+      // Already standalone — fly directly, never zooming below current zoom
+      const targetZoom = Math.max(map.getZoom(), 6)
+      map.flyTo(event.position, targetZoom, { duration: 1.3 })
+      map.once('moveend', () => {
         marker.openPopup()
-      }
-
-      pendingRef.current = null
-    }
-
-    map.once('moveend', onMoveEnd)
-
-    return () => {
-      map.off('moveend', onMoveEnd)
+      })
     }
   }, [event, map, markersRef])
 
@@ -70,6 +54,7 @@ function MapView({ events, selectedEvent, setSelectedEvent }) {
       center={[20, 0]}
       zoom={2}
       minZoom={2}
+      maxZoom={7}
       maxBounds={[[-85, -180], [85, 180]]}
       maxBoundsViscosity={1.0}
       worldCopyJump={true}
@@ -77,22 +62,29 @@ function MapView({ events, selectedEvent, setSelectedEvent }) {
     >
       <TileLayer
         url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}"
+        attribution='Tiles &copy; Esri'
         noWrap={false}
       />
       <MarkerClusterGroup
           showCoverageOnHover={false}
           spiderfyOnEveryZoom={false}
           zoomToBoundsOnClick={true}
+         // disableClusteringAtZoom={8}
         >
         {events.map((event) => (
           <Marker
             key={event.id}
             position={event.position}
             ref={(ref) => {
+              if (ref) {
               markersRef.current[event.id] = ref
-            }}
+            } else {
+              delete markersRef.current[event.id]
+            }
+            }}  
             eventHandlers={{
-              click: () => {
+              click: (e) => {
+                e.target.closePopup()
                 setSelectedEvent(event)
               }
             }}
@@ -107,7 +99,8 @@ function MapView({ events, selectedEvent, setSelectedEvent }) {
                       year: "numeric",
                       hour: "2-digit",
                       minute: "2-digit",
-                      hour12: false
+                      hour12: false,
+                      timeZone: "UTC"
               })} UTC
               </small>
             </Popup>

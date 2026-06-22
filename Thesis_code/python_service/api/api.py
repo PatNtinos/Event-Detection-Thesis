@@ -29,10 +29,13 @@ def get_events():
     cur = conn.cursor()
 
     # Turn interval to 24 when running in production
+    # When lat,lon are null the frontend doesnt know how to display them (so we do this for safety)
     cur.execute("""
         SELECT id, title, description, first_seen, latitude, longitude
         FROM events
-        WHERE first_seen >= NOW() - INTERVAL '100 hours' 
+        WHERE first_seen >= NOW() - INTERVAL '100 hours'
+        AND latitude IS NOT NULL
+        AND longitude IS NOT NULL 
     """)
 
     rows = cur.fetchall()

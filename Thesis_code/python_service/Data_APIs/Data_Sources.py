@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 
 load_dotenv()
 
-
+# API KEYS
 WEBZ_API_KEY = os.getenv("WEBZ_API_KEY")
 NEWS_API_KEY = os.getenv("NEWS_API_KEY")
 MEDIASTACK_API_KEY = os.getenv("MEDIASTACK_API_KEY")
@@ -20,12 +20,18 @@ FINNHUB_API_KEY = os.getenv("FINNHUB_API_KEY")
 # COMMON EVENT FORMAT
 # ========================
 def normalize_event(source, source_id, text, created_at=None, lang=None, url=None):
+    # Skip any event with empty text
+    if not text or not text.strip():
+        return None
+    
     return {
         "source": source,
         "source_id": source_id,
         "text": text,
+        # The created_at is set to the current time, as not all APIs provide a timestamp, when a full pipeline is made, and more APIs are used, this can be changed.
         "created_at": created_at,
         "lang": lang,
+        # The URL is not used in the specs of this Thesis, it can be added for future use
         #"url": url
     }
 
@@ -56,7 +62,7 @@ def fetch_reddit(limit=30):
                 text=p.get("title"),
                 created_at=datetime.now(timezone.utc).isoformat(),
     #            url=p.get("url"),
-                lang="en"  # safe assumption for r/news
+                lang="en"  
             ))
 
         return events
@@ -79,7 +85,7 @@ def fetch_webz(limit=10):
     params = {
         "token": WEBZ_API_KEY,
 
-        # GOOD generic event query
+        # Generic event query
         "q": (
             "earthquake OR disaster OR war "
             "OR emergency "
@@ -100,7 +106,6 @@ def fetch_webz(limit=10):
 
         events = []
 
-        # IMPORTANT:
         # Webz articles are inside "posts"
         for post in data.get("posts", []):
 
@@ -323,8 +328,6 @@ def fetch_guardian(limit=50):
                 source="guardian",
                 source_id=article.get("id"),
                 text=article.get("webTitle"),
-
-                # INSERTION TIME
                 created_at=datetime.now(timezone.utc).isoformat(),
 
                 lang="en"

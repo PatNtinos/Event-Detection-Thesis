@@ -8,15 +8,6 @@ from sentence_transformers import SentenceTransformer
 from dotenv import load_dotenv
 load_dotenv()
 
-"""
-# Import time module to run the embedding process periodically
-# Uncommented at final stages
-import time
-
-while True:
-    main()  # embed all new posts
-    time.sleep(60)  # wait 1 minute
-"""
 # -------- CONFIG --------
 # Database connection parameters to login to PostgreSQL
 DATABASE_URL = os.getenv("DATABASE_URL")
@@ -40,7 +31,7 @@ def normalize_text(text: str) -> str:
 def main():
 
     print("\n🔍 Starting embedding process...\n")
-    # 1. Connect to database
+    # Connect to database
     # to connect to PostgreSQL
     conn = psycopg2.connect(DATABASE_URL)
     # to execute queries
@@ -48,7 +39,7 @@ def main():
 
     
 
-    # 3. Fetch content posts WITHOUT embeddings
+    # Fetch content posts WITHOUT embeddings
     cursor.execute("""
         SELECT c.source_id, c.source, c.text
         FROM content c
@@ -61,9 +52,11 @@ def main():
     # retrieve all rows from the executed query
     rows = cursor.fetchall()
 
-    # For debugging
+    # For the case where there are no new content posts to embed, we skip the whole pipeline
     if not rows:
         print("No new content to embed.")
+        cursor.close()
+        conn.close()
         sys.exit(2)
 
     source_ids = []
@@ -76,7 +69,7 @@ def main():
         sources.append(source)
         texts.append(normalize_text(text))
 
-    # 4. Create embeddings (BATCHED)
+    # Create embeddings (BATCHED)
     print(f"Embedding {len(texts)} posts...")
     # Turn texts into embeddings
     embeddings = model.encode(
@@ -85,17 +78,21 @@ def main():
         show_progress_bar=True
     )
 
-    # 5. Store embeddings
+    # Store embeddings
     # Match post IDs with their embeddings and insert into the database
-    # For TWITTER
-    for source, source_id, text, vector in zip(sources, source_ids, texts, embeddings):
-        cursor.execute("""
-            INSERT INTO content_metadata (source, source_id, embedding, model_name)
-            VALUES (%s, %s, %s, %s)
-            ON CONFLICT (source, source_id) DO NOTHING;
-        """, (source, source_id, vector.tolist(), MODEL_NAME))
 
-    # Saave changes
+    for source, source_id, text, vector in zip(sources, source_ids, texts, embeddings):
+        try:
+            cursor.execute("""
+                INSERT INTO content_metadata (source, source_id, embedding, model_name)
+                VALUES (%s, %s, %s, %s)
+                ON CONFLICT (source, source_id) DO NOTHING;
+            """, (source, source_id, vector.tolist(), MODEL_NAME))
+        except Exception as e:
+            print(f"Error inserting embedding for {source} {source_id}: {e}")
+            conn.rollback()  # Rollback in case of error to avoid partial commits
+
+    # Save changes
     conn.commit()
     # Clean up
     cursor.close()
