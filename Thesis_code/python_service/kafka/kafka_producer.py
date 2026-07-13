@@ -1,7 +1,7 @@
 # We need the KafkaProducer class
 from kafka import KafkaProducer
-# Add twitter client to fetch tweets
-from Thesis_code.python_service.Data_APIs.Data_Sources import fetch_all_events
+# Add data sources to fetch events
+from python_service.Data_APIs.Data_Sources import fetch_all_events
 # To handle the JSON messages
 import json
 # To simulate streaming
